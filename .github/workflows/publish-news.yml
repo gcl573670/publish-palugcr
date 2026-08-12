@@ -1,0 +1,55 @@
+name: Publish News
+
+on:
+  schedule:
+    - cron: '*/15 * * * *'
+  workflow_dispatch:
+    inputs:
+      source:
+        description: 'Override: specific source (newsdata, newsapi, worldnewsapi, gnews, youtube)'
+        required: false
+        type: string
+        default: ''
+      category:
+        description: 'Override: specific category'
+        required: false
+        type: string
+        default: ''
+      max_articles:
+        description: 'Max articles per category'
+        required: false
+        type: number
+        default: 2
+
+concurrency:
+  group: publish-news
+  cancel-in-progress: true
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Run publisher
+        run: node publisher.js
+        env:
+          SITE_API_KEY: ${{ secrets.SITE_API_KEY }}
+          SITE_URL: https://palugcr.live
+          NEWS_DATA_IO_KEY: ${{ secrets.NEWS_DATA_IO_KEY }}
+          YOUTUBE_API_KEY: ${{ secrets.YOUTUBE_API_KEY }}
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          OPENROUTER_MODEL: meta-llama/llama-3.3-70b-instruct
+          NEWSAPI_KEY: ${{ secrets.NEWSAPI_KEY }}
+          WORLDNEWSAPI_KEY: ${{ secrets.WORLDNEWSAPI_KEY }}
+          GNEWS_KEY: ${{ secrets.GNEWS_KEY }}
+          SOURCE: ${{ github.event.inputs.source }}
+          CATEGORY: ${{ github.event.inputs.category }}
+          MAX_ARTICLES: ${{ github.event.inputs.max_articles || 2 }}
