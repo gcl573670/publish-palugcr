@@ -249,21 +249,48 @@ const FETCH_FUNCTIONS = {
 async function aiRewrite(title, content, category) {
   const prompt = `You are a professional news editor and SEO content writer. Rewrite the following article to be engaging, professional, and search-engine optimized. The article MUST be written entirely in English.
 
+CRITICAL FORMATTING RULE:
+The CONTENT field MUST contain exactly 6 separate short paragraphs. Each paragraph must be 2-3 sentences long. Between each paragraph there MUST be a completely empty line. This means double line breaks between paragraphs. Example:
+
+First paragraph text here with two or three sentences maximum.
+
+Second paragraph text here with two or three sentences maximum.
+
+Third paragraph text here with two or three sentences maximum.
+
+Fourth paragraph text here with two or three sentences maximum.
+
+Fifth paragraph text here with two or three sentences maximum.
+
+Sixth paragraph text here with two or three sentences maximum.
+
 RULES:
 - Keep the rewriting factual and accurate to the original
 - Write in a professional journalistic tone
 - The article MUST be in English
 - Make the title compelling and SEO-friendly (keep under 70 characters)
 - Write a concise meta description (under 155 characters) that captures the key point
-- Structure the content into 5 or more short paragraphs (2-3 sentences each), with an empty line separating each paragraph (very important)
+- Write exactly 6 short paragraphs, each 2-3 sentences
+- Separate each paragraph with a blank line (double newline)
 - Naturally incorporate relevant keywords for the category
 - Do NOT add information that isn't in the original
-- Do NOT use markdown, just plain text with paragraph breaks
+- Do NOT use markdown formatting, just plain text
+- Do NOT write one continuous block of text
 - Output ONLY the rewritten title, description, and content, nothing else
 - Format your response exactly like this:
 TITLE: [rewritten title]
 DESCRIPTION: [meta description under 155 characters]
-CONTENT: [rewritten content]
+CONTENT: [paragraph 1]
+
+[paragraph 2]
+
+[paragraph 3]
+
+[paragraph 4]
+
+[paragraph 5]
+
+[paragraph 6]
 
 ORIGINAL TITLE: ${title}
 CATEGORY: ${category}
@@ -567,22 +594,21 @@ async function publishArticle(article, categorySlug, sourceName, sourceKey) {
   let fullContent = '';
 
   if (isYouTube) {
-    // YouTube: embed video at the middle of content
+    // YouTube: embed video after 3rd paragraph, no thumbnail in content
     const videoId = article.video_embed_id || extractYouTubeId(article.video_url);
     if (videoId) {
-      const videoEmbed = `<div style="position:relative;padding-bottom:56.25%;height:0;overflow:hidden;max-width:100%;margin:0 auto 24px;"><iframe src="https://www.youtube.com/embed/${videoId}" style="position:absolute;top:0;left:0;width:100%;height:100%;" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe></div>`;
-      // Split content in half and insert video
+      const videoEmbed = `<div style="position:relative;padding-bottom:56.25%;height:0;overflow:hidden;max-width:100%;margin:20px 0;"><iframe src="https://www.youtube.com/embed/${videoId}" style="position:absolute;top:0;left:0;width:100%;height:100%;" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe></div>`;
+      // Split content and insert video after 3rd paragraph
       const plainText = cleanText(rawContent);
       const paragraphs = plainText.split('\n').filter(p => p.trim());
-      if (paragraphs.length > 2) {
-        const mid = Math.floor(paragraphs.length / 2);
-        const before = paragraphs.slice(0, mid).map(p => `<p>${p.trim()}</p>`).join('\n');
-        const after = paragraphs.slice(mid).map(p => `<p>${p.trim()}</p>`).join('\n');
+      if (paragraphs.length > 3) {
+        const before = paragraphs.slice(0, 3).map(p => `<p>${p.trim()}</p>`).join('\n');
+        const after = paragraphs.slice(3).map(p => `<p>${p.trim()}</p>`).join('\n');
         fullContent = `${before}\n${videoEmbed}\n${after}`;
       } else {
-        fullContent = `${videoEmbed}\n<p>${cleanText(rawContent)}</p>`;
+        fullContent = `<p>${cleanText(rawContent)}</p>\n${videoEmbed}`;
       }
-      console.log(`   📹 Embedded YouTube video: ${videoId}`);
+      console.log(`   📹 Embedded YouTube video after paragraph 3: ${videoId}`);
     } else {
       fullContent = `<p>${cleanText(rawContent)}</p>`;
     }
@@ -807,10 +833,19 @@ function formatContent(content) {
     return content;
   }
 
-  const paragraphs = content.split('\n').filter(p => p.trim());
+  // Split by double newlines (empty lines) to preserve paragraph breaks
+  const paragraphs = content.split(/\n\s*\n/).filter(p => p.trim());
   if (paragraphs.length === 0) return `<p>${content}</p>`;
 
-  return paragraphs.map(p => `<p>${p.trim()}</p>`).join('');
+  // If only one block, try splitting by single newlines
+  if (paragraphs.length === 1) {
+    const lines = content.split('\n').filter(p => p.trim());
+    if (lines.length > 1) {
+      return lines.map(p => `<p>${p.trim()}</p>`).join('\n\n');
+    }
+  }
+
+  return paragraphs.map(p => `<p>${p.trim()}</p>`).join('\n\n');
 }
 
 function formatDate(dateStr) {
