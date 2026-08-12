@@ -599,25 +599,29 @@ async function publishArticle(article, categorySlug, sourceName, sourceKey) {
     const videoId = article.video_embed_id || extractYouTubeId(article.video_url);
     if (videoId) {
       const videoEmbed = `<div style="position:relative;padding-bottom:56.25%;height:0;overflow:hidden;max-width:100%;margin:20px 0;"><iframe src="https://www.youtube.com/embed/${videoId}" style="position:absolute;top:0;left:0;width:100%;height:100%;" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe></div>`;
-      // Split content and insert video after 3rd paragraph
       const plainText = cleanText(rawContent);
-      const paragraphs = plainText.split('\n').filter(p => p.trim());
-      if (paragraphs.length > 3) {
-        const before = paragraphs.slice(0, 3).map(p => `<p>${p.trim()}</p>`).join('\n');
-        const after = paragraphs.slice(3).map(p => `<p>${p.trim()}</p>`).join('\n');
+      // Split by double newlines (AI paragraph format)
+      let paragraphs = plainText.split(/\n\s*\n/).filter(p => p.trim());
+      // Fallback to single newlines if only 1 block
+      if (paragraphs.length <= 1) {
+        paragraphs = plainText.split('\n').filter(p => p.trim());
+      }
+      if (paragraphs.length > 2) {
+        const mid = Math.floor(paragraphs.length / 2);
+        const before = paragraphs.slice(0, mid).map(p => `<p>${p.trim()}</p>`).join('\n\n');
+        const after = paragraphs.slice(mid).map(p => `<p>${p.trim()}</p>`).join('\n\n');
         fullContent = `${before}\n${videoEmbed}\n${after}`;
       } else {
-        fullContent = `<p>${cleanText(rawContent)}</p>\n${videoEmbed}`;
+        fullContent = paragraphs.map(p => `<p>${p.trim()}</p>`).join('\n\n') + `\n${videoEmbed}`;
       }
-      console.log(`   📹 Embedded YouTube video after paragraph 3: ${videoId}`);
+      console.log(`   📹 Embedded YouTube video in middle: ${videoId}`);
     } else {
       fullContent = `<p>${cleanText(rawContent)}</p>`;
     }
   } else if (isNewsData) {
-    // NewsData: embed source video if exists (image is used as featured_image only)
-    let newsDataMedia = '';
+    // NewsData: embed source video in middle of content
+    let videoEmbed = '';
 
-    // Embed video from NewsData source if it exists
     const hasSourceVideo = article.video_url &&
       !article.video_url.includes('ONLY AVAILABLE IN PAID PLANS') &&
       article.video_url !== '' &&
@@ -625,34 +629,44 @@ async function publishArticle(article, categorySlug, sourceName, sourceKey) {
 
     if (hasSourceVideo) {
       const vUrl = article.video_url;
-      let videoEmbed = '';
       if (vUrl.includes('youtube.com') || vUrl.includes('youtu.be')) {
         const ytMatch = vUrl.match(/(?:v=|\/)([a-zA-Z0-9_-]{11})/);
         if (ytMatch) {
-          videoEmbed = `<div style="position:relative;padding-bottom:56.25%;height:0;overflow:hidden;max-width:100%;margin-bottom:20px;"><iframe src="https://www.youtube.com/embed/${ytMatch[1]}" style="position:absolute;top:0;left:0;width:100%;height:100%;" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe></div>`;
+          videoEmbed = `<div style="position:relative;padding-bottom:56.25%;height:0;overflow:hidden;max-width:100%;margin:20px 0;"><iframe src="https://www.youtube.com/embed/${ytMatch[1]}" style="position:absolute;top:0;left:0;width:100%;height:100%;" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe></div>`;
         }
       } else if (vUrl.includes('vimeo.com')) {
         const vimeoMatch = vUrl.match(/vimeo\.com\/(\d+)/);
         if (vimeoMatch) {
-          videoEmbed = `<div style="position:relative;padding-bottom:56.25%;height:0;overflow:hidden;max-width:100%;margin-bottom:20px;"><iframe src="https://player.vimeo.com/video/${vimeoMatch[1]}" style="position:absolute;top:0;left:0;width:100%;height:100%;" frameborder="0" allow="autoplay; fullscreen; picture-in-picture" allowfullscreen></iframe></div>`;
+          videoEmbed = `<div style="position:relative;padding-bottom:56.25%;height:0;overflow:hidden;max-width:100%;margin:20px 0;"><iframe src="https://player.vimeo.com/video/${vimeoMatch[1]}" style="position:absolute;top:0;left:0;width:100%;height:100%;" frameborder="0" allow="autoplay; fullscreen; picture-in-picture" allowfullscreen></iframe></div>`;
         }
       } else if (vUrl.includes('.m3u8')) {
         const vid = `newsdata-video-${Date.now()}`;
-        videoEmbed = `<div style="margin-bottom:20px;"><video id="${vid}" controls style="width:100%;max-height:500px;background:#000;"></video><script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script><script>var v=document.getElementById('${vid}');if(Hls.isSupported()){var h=new Hls();h.loadSource('${vUrl}');h.attachMedia(v);h.on(Hls.Events.MANIFEST_PARSED,function(){v.play()})}else if(v.canPlayType('application/vnd.apple.mpegurl')){v.src='${vUrl}';v.addEventListener('loadedmetadata',function(){v.play()})}</script></div>`;
+        videoEmbed = `<div style="margin:20px 0;"><video id="${vid}" controls style="width:100%;max-height:500px;background:#000;"></video><script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script><script>var v=document.getElementById('${vid}');if(Hls.isSupported()){var h=new Hls();h.loadSource('${vUrl}');h.attachMedia(v);h.on(Hls.Events.MANIFEST_PARSED,function(){v.play()})}else if(v.canPlayType('application/vnd.apple.mpegurl')){v.src='${vUrl}';v.addEventListener('loadedmetadata',function(){v.play()})}</script></div>`;
       } else if (vUrl.match(/\.(mp4|webm|ogg)$/i)) {
         const ext = vUrl.match(/\.(\w+)$/)?.[1] || 'mp4';
         const mimeTypes = { mp4: 'video/mp4', webm: 'video/webm', ogg: 'video/ogg' };
-        videoEmbed = `<div style="margin-bottom:20px;"><video controls style="width:100%;max-height:500px;background:#000;"><source src="${vUrl}" type="${mimeTypes[ext] || 'video/mp4'}">Your browser does not support the video tag.</video></div>`;
+        videoEmbed = `<div style="margin:20px 0;"><video controls style="width:100%;max-height:500px;background:#000;"><source src="${vUrl}" type="${mimeTypes[ext] || 'video/mp4'}">Your browser does not support the video tag.</video></div>`;
       }
       if (videoEmbed) {
-        newsDataMedia += videoEmbed;
         console.log(`   📹 Embedded NewsData source video`);
       }
     }
 
-    // Do NOT add source image to content - it's already the featured image
-
-    fullContent = newsDataMedia + formatContent(finalContent);
+    // Insert video in the middle of the AI-rewritten content
+    const formattedText = formatContent(finalContent);
+    if (videoEmbed) {
+      const paragraphs = formattedText.split(/\n\n/).filter(p => p.trim());
+      if (paragraphs.length > 2) {
+        const mid = Math.floor(paragraphs.length / 2);
+        const before = paragraphs.slice(0, mid).join('\n\n');
+        const after = paragraphs.slice(mid).join('\n\n');
+        fullContent = `${before}\n${videoEmbed}\n${after}`;
+      } else {
+        fullContent = `${formattedText}\n${videoEmbed}`;
+      }
+    } else {
+      fullContent = formattedText;
+    }
   } else {
     // NewsAPI, WorldNewsAPI, GNews: AI-rewritten content only, no video
     fullContent = formatContent(finalContent);
