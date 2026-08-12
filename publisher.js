@@ -613,7 +613,7 @@ async function publishArticle(article, categorySlug, sourceName, sourceKey) {
       fullContent = `<p>${cleanText(rawContent)}</p>`;
     }
   } else if (isNewsData) {
-    // NewsData: embed source video if exists, and inline the source image
+    // NewsData: embed source video if exists (image is used as featured_image only)
     let newsDataMedia = '';
 
     // Embed video from NewsData source if it exists
@@ -649,13 +649,7 @@ async function publishArticle(article, categorySlug, sourceName, sourceKey) {
       }
     }
 
-    // Inline the source article image as a content image (separate from feature image)
-    const hasSourceImage = article.image_url &&
-      article.image_url !== '' &&
-      article.image_url.startsWith('http');
-    if (hasSourceImage) {
-      newsDataMedia += `<figure style="margin:0 0 20px;"><img src="${article.image_url}" alt="${cleanText(article.title)}" style="width:100%;height:auto;border-radius:8px;" /></figure>\n`;
-    }
+    // Do NOT add source image to content - it's already the featured image
 
     fullContent = newsDataMedia + formatContent(finalContent);
   } else {
@@ -829,23 +823,39 @@ function formatContent(content) {
 
   content = cleanText(content);
 
-  if (content.trim().startsWith('<')) {
+  // If content already has proper <p> tags, return as-is
+  if (content.includes('<p>') && content.includes('</p>')) {
+    return content;
+  }
+
+  // If content starts with other HTML tags (like div, figure, video), handle it
+  if (content.trim().startsWith('<') && !content.trim().startsWith('<p>')) {
+    // Extract any existing HTML blocks and text parts
     return content;
   }
 
   // Split by double newlines (empty lines) to preserve paragraph breaks
-  const paragraphs = content.split(/\n\s*\n/).filter(p => p.trim());
-  if (paragraphs.length === 0) return `<p>${content}</p>`;
+  let paragraphs = content.split(/\n\s*\n/).filter(p => p.trim());
 
   // If only one block, try splitting by single newlines
   if (paragraphs.length === 1) {
     const lines = content.split('\n').filter(p => p.trim());
     if (lines.length > 1) {
-      return lines.map(p => `<p>${p.trim()}</p>`).join('\n\n');
+      paragraphs = lines;
     }
   }
 
-  return paragraphs.map(p => `<p>${p.trim()}</p>`).join('\n\n');
+  if (paragraphs.length === 0) return `<p>${content}</p>`;
+
+  // Wrap each paragraph in <p> tags
+  return paragraphs.map(p => {
+    const trimmed = p.trim();
+    // Skip if already wrapped in <p> tags
+    if (trimmed.startsWith('<p>') && trimmed.endsWith('</p>')) {
+      return trimmed;
+    }
+    return `<p>${trimmed}</p>`;
+  }).join('\n\n');
 }
 
 function formatDate(dateStr) {
