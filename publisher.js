@@ -666,6 +666,15 @@ async function publishArticle(article, categorySlug, sourceName, sourceKey) {
   // --- Build post data ---
   const excerptText = cleanText(aiDescription || article.description || finalTitle || '');
 
+  // Safety: strip featured image from content to prevent duplication
+  const featuredUrl = hasImage ? article.image_url : '';
+  if (featuredUrl && fullContent.includes(featuredUrl)) {
+    // Remove <img> tags containing the featured image URL
+    fullContent = fullContent.replace(new RegExp(`<img[^>]*src=["']${featuredUrl.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}["'][^>]*>`, 'gi'), '');
+    fullContent = fullContent.replace(new RegExp(`<figure[^>]*>\\s*<img[^>]*src=["']${featuredUrl.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}["'][^>]*>\\s*</figure>`, 'gi'), '');
+    console.log(`   🖼️ Removed duplicate featured image from content`);
+  }
+
   const postData = {
     title: finalTitle,
     slug: slug,
@@ -788,8 +797,9 @@ function cleanText(text) {
   if (!text) return '';
   return text
     .replace(/ONLY AVAILABLE IN (PAID|PROFESSIONAL|CORPORATE) PLANS/g, '')
-    .replace(/\[\+\d+ chars?\]/g, '')  // Remove [+1234 chars] truncation markers
-    .replace(/\s+/g, ' ')
+    .replace(/\[\+\d+ chars?\]/g, '')
+    .replace(/[^\S\n]+/g, ' ')  // Normalize spaces but NOT newlines
+    .replace(/\n{3,}/g, '\n\n')  // Max 2 consecutive newlines
     .trim();
 }
 
