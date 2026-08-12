@@ -689,6 +689,33 @@ async function publishArticle(article, categorySlug, sourceName, sourceKey) {
   const hasVideo = (isYouTube && article.video_embed_id) ||
     (isNewsData && article.video_url && article.video_url.startsWith('http'));
 
+  // ============================================
+  // VALIDATION: Reject articles with quality issues
+  // ============================================
+
+  // 1. Check for empty content (no text, only HTML tags)
+  const strippedContent = postData.content
+    .replace(/<[^>]*>/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+  if (strippedContent.length < 50) {
+    console.error(`❌ REJECTED: Content too short or empty (${strippedContent.length} chars of text)`);
+    return false;
+  }
+
+  // 2. Check for feature image duplicated inside content
+  if (postData.featured_image && postData.content.includes(postData.featured_image)) {
+    console.error(`❌ REJECTED: Feature image URL found duplicated inside content`);
+    return false;
+  }
+
+  // 3. Check content has actual <p> paragraphs
+  const paragraphCount = (postData.content.match(/<p>/g) || []).length;
+  if (paragraphCount < 2) {
+    console.error(`❌ REJECTED: Content has only ${paragraphCount} paragraph(s), expected 3+`);
+    return false;
+  }
+
   console.log(`📝 Publishing: "${postData.title.substring(0, 60)}..." (${categorySlug})`);
   console.log(`   📎 Source: ${sourceName}`);
   console.log(`   🖼️ Image: ${hasImage ? '✅' : '❌'}`);
