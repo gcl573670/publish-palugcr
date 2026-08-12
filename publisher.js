@@ -255,7 +255,7 @@ RULES:
 - The article MUST be in English
 - Make the title compelling and SEO-friendly (keep under 70 characters)
 - Write a concise meta description (under 155 characters) that captures the key point
-- Structure the content with clear paragraphs (5 or more separate short paragraphs)
+- Structure the content into 5 or more short paragraphs (2-3 sentences each), with an empty line separating each paragraph
 - Naturally incorporate relevant keywords for the category
 - Do NOT add information that isn't in the original
 - Do NOT use markdown, just plain text with paragraph breaks
