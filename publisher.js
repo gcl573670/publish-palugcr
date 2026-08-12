@@ -247,19 +247,22 @@ const FETCH_FUNCTIONS = {
 // AI REWRITE VIA OPENROUTER
 // ============================================
 async function aiRewrite(title, content, category) {
-  const prompt = `You are a professional news editor and SEO content writer. Rewrite the following article to be engaging, professional, and search-engine optimized.
+  const prompt = `You are a professional news editor and SEO content writer. Rewrite the following article to be engaging, professional, and search-engine optimized. The article MUST be written entirely in English.
 
 RULES:
 - Keep the rewriting factual and accurate to the original
 - Write in a professional journalistic tone
+- The article MUST be in English
 - Make the title compelling and SEO-friendly (keep under 70 characters)
+- Write a concise meta description (under 155 characters) that captures the key point
 - Structure the content with clear paragraphs
 - Naturally incorporate relevant keywords for the category
 - Do NOT add information that isn't in the original
 - Do NOT use markdown, just plain text with paragraph breaks
-- Output ONLY the rewritten title and content, nothing else
+- Output ONLY the rewritten title, description, and content, nothing else
 - Format your response exactly like this:
 TITLE: [rewritten title]
+DESCRIPTION: [meta description under 155 characters]
 CONTENT: [rewritten content]
 
 ORIGINAL TITLE: ${title}
@@ -294,10 +297,12 @@ ORIGINAL CONTENT: ${content}`;
     if (!text) return null;
 
     const titleMatch = text.match(/TITLE:\s*(.+)/i);
+    const descMatch = text.match(/DESCRIPTION:\s*(.+)/i);
     const contentMatch = text.match(/CONTENT:\s*([\s\S]+)/i);
 
     return {
       title: titleMatch ? titleMatch[1].trim() : title,
+      description: descMatch ? descMatch[1].trim() : '',
       content: contentMatch ? contentMatch[1].trim() : content,
     };
   } catch (error) {
@@ -540,6 +545,7 @@ async function publishArticle(article, categorySlug, sourceName, sourceKey) {
   // --- AI Rewrite for non-YouTube sources ---
   let finalTitle = rawTitle;
   let finalContent = '';
+  let aiDescription = '';
 
   if (!isYouTube && rawContent) {
     console.log(`   🤖 Rewriting with OpenRouter AI...`);
@@ -547,6 +553,7 @@ async function publishArticle(article, categorySlug, sourceName, sourceKey) {
     if (rewritten) {
       finalTitle = rewritten.title;
       finalContent = rewritten.content;
+      aiDescription = rewritten.description || '';
       console.log(`   ✅ AI rewrite complete`);
     } else {
       console.log(`   ⚠️ AI rewrite failed, using original content`);
@@ -636,7 +643,7 @@ async function publishArticle(article, categorySlug, sourceName, sourceKey) {
   }
 
   // --- Build post data ---
-  const excerptText = cleanText(article.description || finalTitle || '');
+  const excerptText = cleanText(aiDescription || article.description || finalTitle || '');
 
   const postData = {
     title: finalTitle,
