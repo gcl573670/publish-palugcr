@@ -123,6 +123,7 @@ async function fetchNewsData(source, categoryKey, maxArticles) {
   const url = new URL('https://newsdata.io/api/1/latest');
   url.searchParams.append('apikey', source.api_key);
   url.searchParams.append('language', 'en');
+  url.searchParams.append('country', 'us,gb,ca,au,mx');
   url.searchParams.append('category', cat.query);
   url.searchParams.append('image', '1');
   url.searchParams.append('video', '1');
